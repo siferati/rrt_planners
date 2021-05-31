@@ -1,0 +1,5 @@
+<library path="lib/rrt_planners">
+	<class name="rrt_planners/RRTPlanner" type="rrt_planners::RRTPlanner" base_class_type="nav_core::BaseGlobalPlanner">
+		<description>A global planner based on Rapidly-exploring Random Trees.</description>
+	</class>
+</library>
