@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(rrt_planners)
 
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 
-add_compile_options(-std=c++14 -Wall -Wextra -pedantic -Werror)
+add_compile_options(-std=c++14 -Wall -Wextra -pedantic)
 
-set(CATKIN_DEPENDS roscpp nav_core costmap_2d)
+set(CATKIN_DEPENDS roscpp nav_core)
 
 find_package(catkin REQUIRED COMPONENTS ${CATKIN_DEPENDS})
 
@@ -15,9 +15,10 @@ catkin_package(
 	CATKIN_DEPENDS ${CATKIN_DEPENDS}
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME} src/RRTPlanner.cpp)
+include_directories(include SYSTEM ${catkin_INCLUDE_DIRS})
+
+add_library(${PROJECT_NAME} src/RRTPlanner.cpp src/dubins.c)
 
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 

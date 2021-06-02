@@ -1,0 +1,34 @@
+<launch>
+	<!-- parameters -->
+	<param name="/use_sim_time" value="true"/>
+
+	<!-- arguments -->
+	<arg name="pkg" value="$(find intellwheels_stage_nav)"/>
+	<arg name="world" default="lab_feup"/>
+
+	<!-- rviz -->
+	<node name="rviz" pkg="rviz" type="rviz" args="--display-config $(arg pkg)/rviz/$(arg world).rviz" output="screen"/>
+
+	<!-- simulator -->
+	<node name="stage" pkg="stage_ros" type="stageros" args="$(arg pkg)/worlds/$(arg world)/$(arg world).world" output="screen"/>
+
+	<!-- map server -->
+	<node name="map_server" pkg="map_server" type="map_server" args="$(arg pkg)/worlds/$(arg world)/$(arg world).yaml" output="screen"/>
+
+	<!-- fake localization -->
+	<node name="loc" pkg="fake_localization" type="fake_localization" output="screen">
+		<rosparam file="$(arg pkg)/config/loc.yaml"/>
+	</node>
+
+	<!-- navigation -->
+	<node name="nav" pkg="move_base" type="move_base" output="screen">
+		<rosparam file="$(arg pkg)/config/nav.yaml"/>
+		<rosparam file="$(arg pkg)/config/recovery.yaml"/>
+		<rosparam file="$(arg pkg)/config/global_planner.yaml"/>
+		<rosparam file="$(arg pkg)/config/local_planner.yaml"/>
+		<rosparam ns="local_costmap" file="$(arg pkg)/config/common_costmap.yaml"/>
+		<rosparam ns="global_costmap" file="$(arg pkg)/config/common_costmap.yaml"/>
+		<rosparam file="$(arg pkg)/config/local_costmap.yaml"/>
+		<rosparam file="$(arg pkg)/config/global_costmap.yaml"/>
+	</node>
+</launch>

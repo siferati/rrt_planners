@@ -10,5 +10,8 @@
 
 	<depend>roscpp</depend>
 	<depend>nav_core</depend>
-	<depend>costmap_2d</depend>
+
+	<export>
+		<nav_core plugin="${prefix}/rrt_plugins.xml" />
+	</export>
 </package>
