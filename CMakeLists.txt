@@ -5,7 +5,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_compile_options(-std=c++14 -Wall -Wextra -pedantic)
 
-set(CATKIN_DEPENDS roscpp nav_core)
+set(CATKIN_DEPENDS roscpp nav_core visualization_msgs tf2 pluginlib nav_msgs)
 
 find_package(catkin REQUIRED COMPONENTS ${CATKIN_DEPENDS})
 
@@ -15,10 +15,9 @@ catkin_package(
 	CATKIN_DEPENDS ${CATKIN_DEPENDS}
 )
 
-
 include_directories(include SYSTEM ${catkin_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME} src/RRTPlanner.cpp src/dubins.c)
+add_library(${PROJECT_NAME} src/RRTPlanner.cpp src/dubins.cpp)
 
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 

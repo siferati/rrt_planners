@@ -8,7 +8,7 @@
 			"name": "ROS: Launch",
 			"type": "ros",
 			"request": "launch",
-			"target": "${workspaceFolder}/debug.launch"
+			"target": "${workspaceFolder}/../intellwheels_stage_nav/launch/main.launch"
 		}
 	]
 }

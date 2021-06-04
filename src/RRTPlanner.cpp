@@ -1,13 +1,17 @@
 #include <pluginlib/class_list_macros.h>
-#include <tf/tf.h>
+#include <tf2/utils.h>
 #include "rrt_planners/RRTPlanner.h"
+#include <visualization_msgs/Marker.h>
+#include <nav_msgs/Path.h>
 
 #define MAX_TREE_SIZE 100
 #define EPSILON 0.01
-#define STEP_SIZE 0.5
-#define TURNING_RADIUS 0.5
+#define STEP_SIZE 0.25
+#define TURNING_RADIUS 0.1
 #define DUBINS_STEP_SIZE 0.1
+#define DUBINS_PUB_STEP_SIZE 0.05
 #define GOAL_THRESHOLD 0.2
+#define PUBLISH_RATE 30
 
 PLUGINLIB_EXPORT_CLASS(rrt_planners::RRTPlanner, nav_core::BaseGlobalPlanner)
 
@@ -30,13 +34,18 @@ void RRTPlanner::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_
 		std::uniform_real_distribution<double>(0, nextafter(size_y, std::numeric_limits<double>::max())),
 		std::uniform_real_distribution<double>(-M_PI, nextafter(M_PI, std::numeric_limits<double>::max()))
 	};
+
+	ros::NodeHandle nh;
+	this->plan_pub = nh.advertise<nav_msgs::Path>("plan", 10);
+	this->tree_pub = nh.advertise<visualization_msgs::Marker>("rapidly_exploring_random_tree", 10);
+	//this->tree_pub_timer = nh.createTimer(ros::Duration(1 / PUBLISH_RATE), &RRTPlanner::publish_tree, this);
 }
 
 
 bool RRTPlanner::makePlan(
 		const geometry_msgs::PoseStamped& start,
 		const geometry_msgs::PoseStamped& goal,
-		std::vector<geometry_msgs::PoseStamped>& plan)
+		std::vector<geometry_msgs::PoseStamped>& path)
 {		
 	this->tree.clear();
 	this->tree.reserve(MAX_TREE_SIZE);
@@ -45,13 +54,14 @@ bool RRTPlanner::makePlan(
 	auto goal_node = std::make_shared<Node>(
 		goal.pose.position.x,
 		goal.pose.position.y,
-		tf::getYaw(start.pose.orientation));
+		tf2::getYaw(start.pose.orientation));
 
 	// add start to tree
 	this->tree.push_back(std::make_shared<Node>(
 		start.pose.position.x,
 		start.pose.position.y,
-		tf::getYaw(start.pose.orientation)));
+		tf2::getYaw(start.pose.orientation),
+		0));
 
 	while (tree.size() < MAX_TREE_SIZE)
 	{	
@@ -81,26 +91,15 @@ bool RRTPlanner::makePlan(
 		}
 	}
 
-	// no path found
-	if (goal_node->parent == nullptr)
+	if (this->retrace_path(goal_node, path))
 	{
-		return false;
+		this->publish_path(path);
+		return true;
 	}
 
-	auto node = goal_node->parent;
-	while (node != nullptr)
-	{
-		geometry_msgs::PoseStamped pose;
-		pose.pose.position.x = node->x;
-		pose.pose.position.y = node->y;
-		pose.pose.orientation = tf::createQuaternionMsgFromYaw(node->w);
-		plan.push_back(pose);
-
-		node = node->parent;
-	}
-
-	return true;
+	return false;
 }
+
 
 std::shared_ptr<Node> RRTPlanner::nearest_neighbour(std::shared_ptr<const Node> node) const
 {
@@ -120,10 +119,12 @@ std::shared_ptr<Node> RRTPlanner::nearest_neighbour(std::shared_ptr<const Node> 
 	return nearest;
 }
 
+
 double RRTPlanner::distance(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, double c) const
 {
 	return sqrt(c * pow(n1->w - n2->w, 2) + pow(n1->x - n2->x, 2) + pow(n1->y - n2->y, 2));
 }
+
 
 std::shared_ptr<Node> RRTPlanner::lerp(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, const double t) const
 {
@@ -133,20 +134,17 @@ std::shared_ptr<Node> RRTPlanner::lerp(std::shared_ptr<const Node> n1, std::shar
 		n1->w + t*(n2->w - n1->w));
 }
 
-bool RRTPlanner::add_node(std::shared_ptr<Node> node, std::shared_ptr<const Node> parent)
+
+bool RRTPlanner::add_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent)
 {	
 	double q0[] = {parent->x, parent->y, parent->w};
 	double q1[] = {node->x, node->y, node->w};
 
 	// check if given pose is valid
-	auto is_valid = [](double q[3], double t, void* data) -> int
+	// 0: OK | 1: OBSTACLE | -1: ERROR
+	auto check_pose = [](double q[3], double t, void* data) -> int
 	{
 		auto costmap = static_cast<costmap_2d::Costmap2D*>(data);
-		std::cout << costmap->getOriginX() << std::endl;
-
-		std::cout << "olaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << std::endl;
-		std::cout << q[0] << ", " << q[1] << ", " << q[1] << std::endl;
-		std::cout << "olaaaaaaaaaaaaaaaaaaaaaaaaaaaa" << std::endl;
 
 		unsigned int map_x, map_y;
 		if (!costmap->worldToMap(q[0], q[1], map_x, map_y))
@@ -160,14 +158,14 @@ bool RRTPlanner::add_node(std::shared_ptr<Node> node, std::shared_ptr<const Node
 		if (cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE ||
 			cost == costmap_2d::LETHAL_OBSTACLE)
 		{
-			return -1;
+			return 1;
 		}
 
 		return 0;
 	};
 
 	// check if node is valid if it isn't already in the tree
-	if (node->parent == nullptr && !is_valid(q1, 1, this->costmap))
+	if (node->parent == nullptr && check_pose(q1, 1, this->costmap) != 0)
 	{
 		return false;
 	}
@@ -185,7 +183,7 @@ bool RRTPlanner::add_node(std::shared_ptr<Node> node, std::shared_ptr<const Node
 	}
 
 	// check edge for collisions
-	if (dubins_path_sample_many(edge.get(), DUBINS_STEP_SIZE, is_valid, this->costmap) != 0)
+	if (dubins_path_sample_many(edge.get(), DUBINS_STEP_SIZE, check_pose, this->costmap) != 0)
 	{
 		return false;
 	}
@@ -198,5 +196,99 @@ bool RRTPlanner::add_node(std::shared_ptr<Node> node, std::shared_ptr<const Node
 	
 	return true;
 }
+
+void RRTPlanner::publish_path(const std::vector<geometry_msgs::PoseStamped>& path)
+{
+	nav_msgs::Path msg;
+	msg.header.frame_id = this->costmap_ros->getGlobalFrameID();
+	msg.header.stamp = ros::Time::now();
+	msg.poses = path;
+
+	this->plan_pub.publish(msg);
+}
+
+bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path)
+{	
+	if (node == nullptr || node->parent == nullptr) return false;
+	
+	while (node->parent != nullptr)
+	{
+		double q[3];
+		double t = dubins_path_length(node->edge.get());
+		while(t > 0)
+		{
+			dubins_path_sample(node->edge.get(), t, q);
+
+			geometry_msgs::PoseStamped pose;
+			pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
+			pose.pose.position.x = q[0];
+			pose.pose.position.y = q[1];
+			tf2::Quaternion quat;
+			quat.setRPY(0, 0, q[3]);
+			pose.pose.orientation = tf2::toMsg(quat);
+			path.push_back(pose);
+
+			t -= DUBINS_PUB_STEP_SIZE;
+		}
+
+		// t never reaches 0, so we add the parent here
+		geometry_msgs::PoseStamped pose;
+		pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
+		pose.pose.position.x = node->parent->x;
+		pose.pose.position.y = node->parent->y;
+		tf2::Quaternion quat;
+		quat.setRPY(0, 0, node->parent->w);
+		pose.pose.orientation = tf2::toMsg(quat);
+		path.push_back(pose);
+
+		node = node->parent;
+	}
+
+	std::reverse(std::begin(path), std::end(path));
+
+	return true;
+}
+
+/*void RRTPlanner::publish_path(std::shared_ptr<Node> node)
+{
+	visualization_msgs::Marker msg;
+	msg.header.frame_id = this->costmap_ros->getGlobalFrameID();
+	msg.header.stamp = ros::Time::now();
+	msg.ns = "rapidly_exploring_random_tree";
+	msg.id = 0;
+	msg.action = visualization_msgs::Marker::ADD;
+	msg.type = visualization_msgs::Marker::LINE_STRIP;
+	msg.scale.x = 0.01;
+	msg.color.g = 1;
+	msg.color.a = 0.5;
+	msg.pose.orientation.w = 1;
+
+	while (node->parent != nullptr)
+	{
+		double q[3];
+		double t = dubins_path_length(node->edge.get());
+		while(t > 0)
+		{
+			dubins_path_sample(node->edge.get(), t, q);
+
+			geometry_msgs::Point p;
+			p.x = q[0];
+			p.y = q[1];
+			msg.points.push_back(p);
+
+			t -= DUBINS_PUB_STEP_SIZE;
+		}
+
+		// t never reaches 0, so we add the parent here
+		geometry_msgs::Point p;
+		p.x = node->parent->x;
+		p.y = node->parent->y;
+		msg.points.push_back(p);
+
+		node = node->parent;
+	}
+
+	this->tree_pub.publish(msg);
+}*/
 
 }

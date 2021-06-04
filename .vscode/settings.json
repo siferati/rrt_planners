@@ -68,6 +68,11 @@
 		"cfenv": "cpp",
 		"cinttypes": "cpp",
 		"typeindex": "cpp",
-		"typeinfo": "cpp"
+		"typeinfo": "cpp",
+		"condition_variable": "cpp",
+		"forward_list": "cpp",
+		"future": "cpp",
+		"mutex": "cpp",
+		"valarray": "cpp"
 	}
 }

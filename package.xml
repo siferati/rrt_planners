@@ -10,6 +10,10 @@
 
 	<depend>roscpp</depend>
 	<depend>nav_core</depend>
+	<depend>visualization_msgs</depend>
+	<depend>tf2</depend>
+	<depend>pluginlib</depend>
+	<depend>nav_msgs</depend>
 
 	<export>
 		<nav_core plugin="${prefix}/rrt_plugins.xml" />

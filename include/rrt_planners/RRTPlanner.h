@@ -15,9 +15,18 @@ public:
 	bool makePlan(
 		const geometry_msgs::PoseStamped& start,
 		const geometry_msgs::PoseStamped& goal,
-		std::vector<geometry_msgs::PoseStamped>& plan);
+		std::vector<geometry_msgs::PoseStamped>& path);
 
 private:
+	/** Publisher for the tree. */
+	ros::Publisher tree_pub;
+
+	/** Timer for the publisher of the tree. */
+	ros::Timer tree_pub_timer;
+
+	/** Publisher for the plan. */
+	ros::Publisher plan_pub;
+
 	/** ROS wrapper for the 2d costmap. */
 	costmap_2d::Costmap2DROS* costmap_ros;
 
@@ -43,7 +52,21 @@ private:
 	std::shared_ptr<Node> lerp(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, const double t) const;
 
 	/** Add the given node to the tree and set its parent. Returns true if successful, False otherwise. */
-	bool add_node(std::shared_ptr<Node> node, std::shared_ptr<const Node> parent);
+	bool add_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent);
+
+	/** Callback for publishing the plan. */
+	void publish_path(const std::vector<geometry_msgs::PoseStamped>& plan);
+
+	/**
+	 * Retraces the path from the given node back to the root of the tree
+	 * and reverses it for convenience's sake.
+	 * 
+	 * @param node Node to start retracing from.
+	 * @param path Output -- path found from the root of the tree to the given node.
+	 * 
+	 * @return True if a path exists, False otherwise.
+	 */
+	bool retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path);
 };
 
 }
