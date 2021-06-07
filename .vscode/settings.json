@@ -73,6 +73,7 @@
 		"forward_list": "cpp",
 		"future": "cpp",
 		"mutex": "cpp",
-		"valarray": "cpp"
+		"valarray": "cpp",
+		"*.ipp": "cpp"
 	}
 }

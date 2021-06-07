@@ -58,28 +58,35 @@ bool RRTPlanner::makePlan(
 
 	// add start to tree
 	this->tree.push_back(std::make_shared<Node>(
-		start.pose.position.x,
-		start.pose.position.y,
-		tf2::getYaw(start.pose.orientation),
+		Pose(
+			start.pose.position.x,
+			start.pose.position.y,
+			tf2::getYaw(start.pose.orientation)),
 		0));
 
 	while (tree.size() < MAX_TREE_SIZE)
-	{	
-		// sample random node
-		double x = pose_distribution[0](this->rng);
-		double y = pose_distribution[0](this->rng);
-		double w = pose_distribution[0](this->rng);
-		auto node = std::make_shared<Node>(x, y, w);
+	{
+		// sample random pose from free space
+		Pose pose = this->sample_random_pose();
+		double pose_array[] = {pose.x, pose.y, pose.yaw};
 
-		auto nearest = this->nearest_neighbour(node);
-		double dist = this->distance(node, nearest);
+		// get nearest node in the tree
+		auto nearest = this->get_nearest_node(pose);
+		double nearest_array[] = {nearest->pose.x, nearest->pose.y, nearest->pose.yaw};
+
+		// tree edge is the shortest dubins path between the two poses
+		DubinsPath edge;		
+		dubins_shortest_path(&edge, nearest_array, pose_array, TURNING_RADIUS);
 
 		// saturate
-		if (dist > STEP_SIZE)
+		if (dubins_path_length(&edge) > STEP_SIZE)
 		{
-			node = this->lerp(nearest, node, STEP_SIZE / dist);
-			dist = STEP_SIZE;
+			pose = this->steer(edge, STEP_SIZE);
+			dubins_extract_subpath(&edge, STEP_SIZE, &edge);
 		}
+
+		// TODO collision check edge
+		// TODO error on dubins return != 0
 		
 		// add node to the tree
 		if (this->add_node(node, nearest))
@@ -101,14 +108,59 @@ bool RRTPlanner::makePlan(
 }
 
 
-std::shared_ptr<Node> RRTPlanner::nearest_neighbour(std::shared_ptr<const Node> node) const
+bool RRTPlanner::is_pose_in_collision(const Pose& pose) const
+{
+	unsigned int map_x, map_y;
+	if (!costmap->worldToMap(pose.x, pose.y, map_x, map_y))
+	{
+		ROS_ERROR("Invalid conversion from world coordinates to map coordinates.");
+		return true;
+	}
+	
+	// TODO check footprint when possibly circumscribed
+	unsigned char cost = costmap->getCost(map_x, map_y);
+	if (cost == costmap_2d::INSCRIBED_INFLATED_OBSTACLE ||
+		cost == costmap_2d::LETHAL_OBSTACLE)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+Pose RRTPlanner::sample_random_pose() const
+{
+	Pose pose;
+	do
+	{
+		pose.x = this->pose_distribution[0](this->rng);
+		pose.y = this->pose_distribution[0](this->rng);
+		pose.yaw = this->pose_distribution[0](this->rng);
+	}
+	while (this->is_pose_in_collision(pose));
+	
+	return pose;
+}
+
+
+Pose RRTPlanner::steer(DubinsPath& path, const double t) const
+{	
+	double pose_array[3];
+	dubins_path_sample(&path, t, pose_array);
+
+	return Pose(pose_array[0], pose_array[1], pose_array[2]);
+}
+
+
+std::shared_ptr<Node> RRTPlanner::get_nearest_node(const Pose& pose) const
 {
 	std::shared_ptr<Node> nearest = nullptr;
 	double min_dist = std::numeric_limits<double>::max();
 
 	for (const auto& elem : tree)
 	{
-		double dist = this->distance(node, elem);
+		double dist = pose.distance_to(elem->pose);
 		if (dist < min_dist)
 		{
 			min_dist = dist;
@@ -117,21 +169,6 @@ std::shared_ptr<Node> RRTPlanner::nearest_neighbour(std::shared_ptr<const Node> 
 	}
 
 	return nearest;
-}
-
-
-double RRTPlanner::distance(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, double c) const
-{
-	return sqrt(c * pow(n1->w - n2->w, 2) + pow(n1->x - n2->x, 2) + pow(n1->y - n2->y, 2));
-}
-
-
-std::shared_ptr<Node> RRTPlanner::lerp(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, const double t) const
-{
-	return std::make_shared<Node>(
-		n1->x + t*(n2->x - n1->x),
-		n1->y + t*(n2->y - n1->y),
-		n1->w + t*(n2->w - n1->w));
 }
 
 

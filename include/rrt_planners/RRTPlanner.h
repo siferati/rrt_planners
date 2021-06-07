@@ -17,6 +17,43 @@ public:
 		const geometry_msgs::PoseStamped& goal,
 		std::vector<geometry_msgs::PoseStamped>& path);
 
+	/**
+	 * Checks if the given pose is in collision with any obstacles.
+	 * 
+	 * @param pose	The pose to evaluate.
+	 * 
+	 * @return 		True if the pose is in collision,
+	 * 				False otherwise.
+	 */ 
+	bool is_pose_in_collision(const Pose& pose) const;
+
+	/**
+	 * Samples a random pose from the obstacle-free space.
+	 * 
+	 * @return The sampled pose.
+	 */ 
+	Pose sample_random_pose() const;
+
+	/**
+	 * Computes the pose that is t distance away
+	 * from the start of the given path.
+	 *
+	 * @param path	The path to evaluate.
+	 * @param t		The distance to steer.
+	 * 
+	 * @return 		The computed pose.
+	 */ 
+	Pose steer(DubinsPath& path, const double t) const;
+
+	/**
+	 * Searches the tree for the nearest node to the given pose.
+	 * 
+	 * @param pose	Pose to evaluate.
+	 * 
+	 * @return		Nearest node in the tree.
+	 */ 
+	std::shared_ptr<Node> get_nearest_node(const Pose& pose) const;
+
 private:
 	/** Publisher for the tree. */
 	ros::Publisher tree_pub;
@@ -40,16 +77,7 @@ private:
 	std::mt19937 rng;
 
 	/** Distribution for sampling random nodes. */
-	std::array<std::uniform_real_distribution<double>, 3> pose_distribution;
-
-	/** Find the nearest neighbour of the given node in the tree. */
-	std::shared_ptr<Node> nearest_neighbour(std::shared_ptr<const Node> node) const;
-
-	/** Computes the distance between the given nodes, multiplying heading distance by given weight. */
-	double distance(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, double c = 1.0) const;
-
-	/** Computes the linear interpolation between the given nodes for the given t. */ 
-	std::shared_ptr<Node> lerp(std::shared_ptr<const Node> n1, std::shared_ptr<const Node> n2, const double t) const;
+	mutable std::array<std::uniform_real_distribution<double>, 3> pose_distribution;
 
 	/** Add the given node to the tree and set its parent. Returns true if successful, False otherwise. */
 	bool add_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent);
