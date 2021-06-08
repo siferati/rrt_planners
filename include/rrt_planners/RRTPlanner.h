@@ -2,6 +2,8 @@
 
 #include <nav_core/base_global_planner.h>
 #include <random>
+#include <mutex>
+#include <atomic>
 #include "rrt_planners/Node.h"
 
 namespace rrt_planners
@@ -28,11 +30,21 @@ public:
 	bool is_pose_in_collision(const Pose& pose) const;
 
 	/**
+	 * Checks if the given path is in collision with any obstacles.
+	 * 
+	 * @param path	The path to evaluate.
+	 * 
+	 * @return		True if the path is in collision,
+	 * 				False otherwise.
+	 */ 
+	bool is_path_in_collision(DubinsPath& path) const;
+
+	/**
 	 * Samples a random pose from the obstacle-free space.
 	 * 
 	 * @return The sampled pose.
 	 */ 
-	Pose sample_random_pose() const;
+	Pose sample_random_pose();
 
 	/**
 	 * Computes the pose that is t distance away
@@ -54,6 +66,59 @@ public:
 	 */ 
 	std::shared_ptr<Node> get_nearest_node(const Pose& pose) const;
 
+	/**
+	 * Creates a new node with the given pose and adds it to the tree.
+	 * 
+	 * @param pose		Pose of the new node.
+	 * @param parent	Parent of the new node.
+	 * @param edge		Edge from the parent node to the new node.
+	 * 
+	 * @return			The new node.
+	 */ 
+	std::shared_ptr<Node> add_node(const Pose& pose, std::shared_ptr<Node> parent, DubinsPath& edge);
+
+	/**
+	 * Reconnects the given node to the given parent if it's cheaper than current connection,
+	 * and there are no obstacles in the way.
+	 * 
+	 * @param node		The node to reconnect.
+	 * @param parent	The new parent of the node.
+	 * 
+	 * @return 			True if the node was reconnected,
+	 * 					False otherwise.
+	 */ 
+	bool reconnect_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent);
+
+	/**
+	 * Retraces the path from the given node back to the root of the tree,
+	 * and reverses it for convenience's sake.
+	 * 
+	 * @param node Node to start retracing from.
+	 * @param path Output -- path found from the root of the tree to the given node.
+	 * 
+	 * @return True if a path exists, False otherwise.
+	 */
+	bool retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path);
+
+	/**
+	 * Publishes the given path.
+	 * 
+	 * @param path Path to publish.
+	 */ 
+	void publish_path(const std::vector<geometry_msgs::PoseStamped>& path) const;
+
+	/**
+	 * Callback for publishing the current tree on a fixed timer.
+	 * 
+	 * @param event	Information about the current callback event.
+	 */ 
+	void publish_tree_cb(const ros::TimerEvent& event);
+
+	/**
+	 * Clears the published markers.
+	 */ 
+	void clear_markers() const;
+
 private:
 	/** Publisher for the tree. */
 	ros::Publisher tree_pub;
@@ -73,28 +138,23 @@ private:
 	/** List of nodes currently in the tree. */
 	std::vector<std::shared_ptr<Node>> tree;
 
+	/** Mutex for accessing the list of nodes. */
+	std::mutex tree_mutex;
+
+	/** True if currently planning, False otherwise. */
+	std::atomic_bool is_planning;
+
+	/** True if the last tree after planning finished was published, False otherwise. */
+	std::atomic_bool is_last_tree_published;
+
 	/** Random number generator. */
 	std::mt19937 rng;
 
 	/** Distribution for sampling random nodes. */
-	mutable std::array<std::uniform_real_distribution<double>, 3> pose_distribution;
+	std::array<std::uniform_real_distribution<double>, 3> pose_distribution;
 
-	/** Add the given node to the tree and set its parent. Returns true if successful, False otherwise. */
-	bool add_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent);
-
-	/** Callback for publishing the plan. */
-	void publish_path(const std::vector<geometry_msgs::PoseStamped>& plan);
-
-	/**
-	 * Retraces the path from the given node back to the root of the tree
-	 * and reverses it for convenience's sake.
-	 * 
-	 * @param node Node to start retracing from.
-	 * @param path Output -- path found from the root of the tree to the given node.
-	 * 
-	 * @return True if a path exists, False otherwise.
-	 */
-	bool retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path);
+	/** Distribution for sampling the goal node. */
+	std::uniform_real_distribution<double> goal_sample_distribution;
 };
 
 }

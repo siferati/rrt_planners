@@ -11,8 +11,8 @@ namespace rrt_planners
 		: Node(Pose())
 		{};
 		
-		Node(const Pose& pose, double cost = std::numeric_limits<double>::max())
-		: pose(pose), cost(cost), parent(nullptr), edge(nullptr)
+		Node(const Pose& pose)
+		: pose(pose), cost(std::numeric_limits<double>::max())
 		{};
 
 		/** Pose of the node. */
@@ -25,6 +25,6 @@ namespace rrt_planners
 		std::shared_ptr<Node> parent;
 
 		/** Edge from this node to the parent. */
-		std::unique_ptr<DubinsPath> edge;	
+		DubinsPath edge;	
 	};
 }

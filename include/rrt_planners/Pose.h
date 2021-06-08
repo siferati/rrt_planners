@@ -22,8 +22,13 @@ namespace rrt_planners
 		 */
 		double distance_to(const Pose& pose, double c = 1.0) const
 		{
+			// shortest angle
+			double delta_yaw = this->yaw - pose.yaw;
+			if (delta_yaw > M_PI) delta_yaw -= 2 * M_PI;
+			else if (delta_yaw < -M_PI) delta_yaw += 2 * M_PI;
+			
 			return sqrt(
-				c * pow(this->yaw - pose.yaw, 2) +
+				c * pow(delta_yaw, 2) +
 				pow(this->x - pose.x, 2) +
 				pow(this->y - pose.y, 2));
 		}
