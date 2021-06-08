@@ -12,12 +12,22 @@ namespace rrt_planners
 class RRTPlanner : public nav_core::BaseGlobalPlanner
 {
 public:
-	void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros);
+	// TODO dynamic reconfigure
+	static constexpr int MAX_TREE_SIZE = 10000;
+	static constexpr double EPSILON = 0.05;
+	static constexpr double RRT_STEP_SIZE = 0.5;
+	static constexpr double TURNING_RADIUS = 0.25;
+	static constexpr double DUBINS_COL_STEP_SIZE = 0.25;
+	static constexpr double DUBINS_PUB_STEP_SIZE = 0.05;
+	static constexpr double GOAL_THRESHOLD = 2.0;
+	static constexpr int TREE_PUBLISH_RATE = 30;
 
-	bool makePlan(
+	virtual void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros) override;
+
+	virtual bool makePlan(
 		const geometry_msgs::PoseStamped& start,
 		const geometry_msgs::PoseStamped& goal,
-		std::vector<geometry_msgs::PoseStamped>& path);
+		std::vector<geometry_msgs::PoseStamped>& path) override;
 
 	/**
 	 * Checks if the given pose is in collision with any obstacles.
@@ -75,7 +85,7 @@ public:
 	 * 
 	 * @return			The new node.
 	 */ 
-	std::shared_ptr<Node> add_node(const Pose& pose, std::shared_ptr<Node> parent, DubinsPath& edge);
+	virtual std::shared_ptr<Node> add_node(const Pose& pose, std::shared_ptr<Node> parent, DubinsPath& edge);
 
 	/**
 	 * Reconnects the given node to the given parent if it's cheaper than current connection,
@@ -119,7 +129,7 @@ public:
 	 */ 
 	void clear_markers() const;
 
-private:
+protected:
 	/** Publisher for the tree. */
 	ros::Publisher tree_pub;
 

@@ -4,15 +4,6 @@
 #include <visualization_msgs/Marker.h>
 #include <nav_msgs/Path.h>
 
-#define MAX_TREE_SIZE 1000
-#define EPSILON 0.05
-#define STEP_SIZE 0.5
-#define TURNING_RADIUS 0.5
-#define DUBINS_STEP_SIZE 0.25
-#define DUBINS_PUB_STEP_SIZE 0.05
-#define GOAL_THRESHOLD 2.0
-#define PUBLISH_RATE 30
-
 PLUGINLIB_EXPORT_CLASS(rrt_planners::RRTPlanner, nav_core::BaseGlobalPlanner)
 
 namespace rrt_planners
@@ -39,7 +30,7 @@ void RRTPlanner::initialize(std::string name, costmap_2d::Costmap2DROS* costmap_
 	ros::NodeHandle nh;
 	this->plan_pub = nh.advertise<nav_msgs::Path>("plan", 10);
 	this->tree_pub = nh.advertise<visualization_msgs::Marker>("rapidly_exploring_random_tree", 10);
-	this->tree_pub_timer = nh.createTimer(ros::Duration(1 / PUBLISH_RATE), &RRTPlanner::publish_tree_cb, this);
+	this->tree_pub_timer = nh.createTimer(ros::Duration(1 / TREE_PUBLISH_RATE), &RRTPlanner::publish_tree_cb, this);
 }
 
 
@@ -92,10 +83,10 @@ bool RRTPlanner::makePlan(
 		dubins_shortest_path(&edge, edge_begin, edge_end, TURNING_RADIUS);
 
 		// saturate
-		if (dubins_path_length(&edge) > STEP_SIZE)
+		if (dubins_path_length(&edge) > RRT_STEP_SIZE)
 		{
-			pose = this->steer(edge, STEP_SIZE);
-			dubins_extract_subpath(&edge, STEP_SIZE, &edge);
+			pose = this->steer(edge, RRT_STEP_SIZE);
+			dubins_extract_subpath(&edge, RRT_STEP_SIZE, &edge);
 		}
 
 		// TODO error on dubins return != 0
@@ -171,7 +162,7 @@ bool RRTPlanner::is_path_in_collision(DubinsPath& path) const
 			return true;
 		}
 		
-        t += DUBINS_STEP_SIZE;
+        t += DUBINS_COL_STEP_SIZE;
     }
 
 	// last pose in the path
@@ -213,7 +204,7 @@ std::shared_ptr<Node> RRTPlanner::get_nearest_node(const Pose& pose) const
 	std::shared_ptr<Node> nearest = nullptr;
 	double min_dist = std::numeric_limits<double>::max();
 
-	for (const auto& elem : tree)
+	for (const auto& elem : this->tree)
 	{
 		double dist = pose.distance_to(elem->pose);
 		if (dist < min_dist)

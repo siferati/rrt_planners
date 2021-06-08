@@ -17,7 +17,7 @@ catkin_package(
 
 include_directories(include SYSTEM ${catkin_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME} src/RRTPlanner.cpp src/dubins.cpp)
+add_library(${PROJECT_NAME} src/RRTPlanner.cpp src/RRTStarPlanner.cpp src/dubins.cpp)
 
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})
 
