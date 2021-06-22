@@ -1,0 +1,16 @@
+<launch>
+	<arg name="pkg" value="$(find intellwheels_stage_nav)"/>
+	<!--<include file="$(find rrt_planners)/launch/core.launch"/>-->
+	
+	<node name="nav" pkg="move_base" type="move_base" output="screen" clear_params="true">
+		<rosparam file="$(arg pkg)/config/nav.yaml"/>
+		<rosparam file="$(arg pkg)/config/recovery.yaml"/>
+		<rosparam file="$(arg pkg)/config/global_planner.yaml"/>
+		<rosparam file="$(arg pkg)/config/local_planner.yaml"/>
+		<rosparam ns="local_costmap" file="$(arg pkg)/config/common_costmap.yaml"/>
+		<rosparam ns="global_costmap" file="$(arg pkg)/config/common_costmap.yaml"/>
+		<rosparam file="$(arg pkg)/config/local_costmap.yaml"/>
+		<rosparam file="$(arg pkg)/config/global_costmap.yaml"/>
+		<remap from="cmd_vel" to="asd"/>
+	</node>
+</launch>

@@ -22,7 +22,7 @@ namespace rrt_planners
 		double cost;
 
 		/** Parent of this node. */
-		std::shared_ptr<Node> parent;
+		std::weak_ptr<Node> parent;
 
 		/** Edge from this node to the parent. */
 		DubinsPath edge;	

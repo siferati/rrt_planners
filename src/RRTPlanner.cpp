@@ -238,7 +238,6 @@ bool RRTPlanner::reconnect_node(std::shared_ptr<Node> node, std::shared_ptr<Node
 	node->parent = parent;
 	node->cost = cost;
 	node->edge = edge;
-	this->tree.push_back(node);
 
 	return true;
 }
@@ -268,12 +267,12 @@ void RRTPlanner::publish_path(const std::vector<geometry_msgs::PoseStamped>& pat
 
 bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path)
 {	
-	if (node == nullptr || node->parent == nullptr)
+	if (node == nullptr || node->parent.expired())
 	{
 		return false;
 	}
 	
-	while (node->parent != nullptr)
+	while (!node->parent.expired())
 	{
 		double sample[3];
 		double t = dubins_path_length(&node->edge);
@@ -294,16 +293,17 @@ bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_m
 		}
 
 		// t never reaches 0, so we add the parent here
+		std::shared_ptr<Node> parent = node->parent.lock();
 		geometry_msgs::PoseStamped pose;
 		pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
-		pose.pose.position.x = node->parent->pose.x;
-		pose.pose.position.y = node->parent->pose.y;
+		pose.pose.position.x = parent->pose.x;
+		pose.pose.position.y = parent->pose.y;
 		tf2::Quaternion quat;
-		quat.setRPY(0, 0, node->parent->pose.yaw);
+		quat.setRPY(0, 0, parent->pose.yaw);
 		pose.pose.orientation = tf2::toMsg(quat);
 		path.push_back(pose);
 
-		node = node->parent;
+		node = parent;
 	}
 
 	std::reverse(std::begin(path), std::end(path));
@@ -344,19 +344,13 @@ void RRTPlanner::publish_tree_cb(const ros::TimerEvent& event)
 		this->is_last_tree_published.store(false);
 	}
 	
-	
-	std::vector<std::shared_ptr<Node>> nodes;
-	
-	// thread safe deep copy
-	{
-		std::lock_guard<std::mutex> lock(this->tree_mutex);
-		nodes = this->tree;
-	}
+	// TODO lock deep copy
+	std::lock_guard<std::mutex> lock(this->tree_mutex);
 
 	// skip tree root
-	for (size_t i = 1; i  < nodes.size(); ++i)
+	for (size_t i = 1; i  < this->tree.size(); ++i)
 	{
-		const std::shared_ptr<Node>& node = nodes[i];
+		const std::shared_ptr<Node>& node = this->tree[i];
 
 		visualization_msgs::Marker msg;
 		msg.header.frame_id = this->costmap_ros->getGlobalFrameID();
@@ -385,9 +379,11 @@ void RRTPlanner::publish_tree_cb(const ros::TimerEvent& event)
 		}
 
 		// t never reaches 0, so we add the parent here
+
+		std::shared_ptr<Node> parent = node->parent.lock();
 		geometry_msgs::Point p;
-		p.x = node->parent->pose.x;
-		p.y = node->parent->pose.y;
+		p.x = parent->pose.x;
+		p.y = parent->pose.y;
 		msg.points.push_back(p);
 
 		this->tree_pub.publish(msg);

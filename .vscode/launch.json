@@ -8,7 +8,8 @@
 			"name": "ROS: Launch",
 			"type": "ros",
 			"request": "launch",
-			"target": "${workspaceFolder}/../intellwheels_stage_nav/launch/main.launch"
+			"target": "${workspaceFolder}/launch/nav.launch",
+			"preLaunchTask": "${defaultBuildTask}"
 		}
 	]
 }

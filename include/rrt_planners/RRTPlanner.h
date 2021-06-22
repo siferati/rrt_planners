@@ -13,7 +13,7 @@ class RRTPlanner : public nav_core::BaseGlobalPlanner
 {
 public:
 	// TODO dynamic reconfigure
-	static constexpr int MAX_TREE_SIZE = 10000;
+	static constexpr int MAX_TREE_SIZE = 1000;
 	static constexpr double EPSILON = 0.05;
 	static constexpr double RRT_STEP_SIZE = 0.5;
 	static constexpr double TURNING_RADIUS = 0.25;

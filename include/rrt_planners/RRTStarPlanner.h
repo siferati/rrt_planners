@@ -9,7 +9,7 @@ class RRTStarPlanner : public RRTPlanner
 {
 public:
 	// TODO actually shrink it
-	static constexpr double SHRINKING_RADIUS = 2.0;
+	static constexpr double SHRINKING_RADIUS = 1.0;
 
 	virtual void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros) override;
 
