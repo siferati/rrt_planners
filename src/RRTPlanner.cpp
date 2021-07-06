@@ -71,22 +71,17 @@ bool RRTPlanner::makePlan(
 	while (tree.size() < MAX_TREE_SIZE)
 	{
 		// sample goal pose or random pose from free space
-		Pose pose = this->goal_sample_distribution(this->rng) < EPSILON ? goal_node->pose : this->sample_random_pose();
-		double edge_end[] = {pose.x, pose.y, pose.yaw};
+		Pose pose = this->goal_sample_distribution(this->rng) < GOAL_SAMPLE_CHANCE ? goal_node->pose : this->sample_random_pose();
 
-		// get nearest node in the tree
+		// compute edge to nearest node in the tree
 		auto nearest = this->get_nearest_node(pose);
-		double edge_begin[] = {nearest->pose.x, nearest->pose.y, nearest->pose.yaw};
-
-		// tree edge is the shortest dubins path between the two poses
-		DubinsPath edge;		
-		dubins_shortest_path(&edge, edge_begin, edge_end, TURNING_RADIUS);
+		auto edge = this->compute_path(nearest->pose, pose);	
 
 		// saturate
-		if (dubins_path_length(&edge) > RRT_STEP_SIZE)
+		if (dubins_path_length(edge.get()) > RRT_STEP_SIZE)
 		{
 			pose = this->steer(edge, RRT_STEP_SIZE);
-			dubins_extract_subpath(&edge, RRT_STEP_SIZE, &edge);
+			dubins_extract_subpath(edge.get(), RRT_STEP_SIZE, edge.get());
 		}
 
 		// TODO error on dubins return != 0
@@ -143,16 +138,16 @@ bool RRTPlanner::is_pose_in_collision(const Pose& pose) const
 }
 
 
-bool RRTPlanner::is_path_in_collision(DubinsPath& path) const
+bool RRTPlanner::is_path_in_collision(std::shared_ptr<DubinsPath> path) const
 {
 	double sample[3];
 	Pose pose;
     double t = 0;
-    double length = dubins_path_length(&path);
+    double length = dubins_path_length(path.get());
 
     while(t <  length)
 	{
-        dubins_path_sample(&path, t, sample);
+        dubins_path_sample(path.get(), t, sample);
 		pose.x = sample[0];
 		pose.y = sample[1];
 		pose.yaw = sample[2];
@@ -166,7 +161,7 @@ bool RRTPlanner::is_path_in_collision(DubinsPath& path) const
     }
 
 	// last pose in the path
-	dubins_path_sample(&path, length, sample);
+	dubins_path_sample(path.get(), length, sample);
 	pose.x = sample[0];
 	pose.y = sample[1];
 	pose.yaw = sample[2];
@@ -190,10 +185,10 @@ Pose RRTPlanner::sample_random_pose()
 }
 
 
-Pose RRTPlanner::steer(DubinsPath& path, const double t) const
+Pose RRTPlanner::steer(std::shared_ptr<DubinsPath> path, const double t) const
 {	
 	double sample[3];
-	dubins_path_sample(&path, t, sample);
+	dubins_path_sample(path.get(), t, sample);
 
 	return Pose(sample[0], sample[1], sample[2]);
 }
@@ -220,13 +215,9 @@ std::shared_ptr<Node> RRTPlanner::get_nearest_node(const Pose& pose) const
 
 bool RRTPlanner::reconnect_node(std::shared_ptr<Node> node, std::shared_ptr<Node> parent)
 {
-	double edge_begin[] = {parent->pose.x, parent->pose.y, parent->pose.yaw};
-	double edge_end[] = {node->pose.x, node->pose.y, node->pose.yaw};
-
 	// create edge between the two nodes
-	DubinsPath edge;		
-	dubins_shortest_path(&edge, edge_begin, edge_end, TURNING_RADIUS);
-	double cost = parent->cost + dubins_path_length(&edge);
+	auto edge = this->compute_path(parent->pose, node->pose);
+	double cost = parent->cost + dubins_path_length(edge.get());
 
 	// no need to reconnect if it's more expensive or there are obstacles
 	if (cost >= node->cost || this->is_path_in_collision(edge))
@@ -243,12 +234,12 @@ bool RRTPlanner::reconnect_node(std::shared_ptr<Node> node, std::shared_ptr<Node
 }
 
 
-std::shared_ptr<Node> RRTPlanner::add_node(const Pose& pose, std::shared_ptr<Node> parent, DubinsPath& edge)
+std::shared_ptr<Node> RRTPlanner::add_node(const Pose& pose, std::shared_ptr<Node> parent, std::shared_ptr<DubinsPath> edge)
 {
 	// add new node to the tree
 	auto node = std::make_shared<Node>(pose);
 	node->parent = parent;
-	node->cost = parent->cost + dubins_path_length(&edge);
+	node->cost = parent->cost + dubins_path_length(edge.get());
 	node->edge = edge;
 	this->tree.push_back(node);
 
@@ -267,18 +258,18 @@ void RRTPlanner::publish_path(const std::vector<geometry_msgs::PoseStamped>& pat
 
 bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path)
 {	
-	if (node == nullptr || node->parent.expired())
+	if (node == nullptr || node->parent == nullptr)
 	{
 		return false;
 	}
 	
-	while (!node->parent.expired())
+	while (node->parent != nullptr)
 	{
 		double sample[3];
-		double t = dubins_path_length(&node->edge);
+		double t = dubins_path_length(node->edge.get());
 		while(t > 0)
 		{
-			dubins_path_sample(&node->edge, t, sample);
+			dubins_path_sample(node->edge.get(), t, sample);
 
 			geometry_msgs::PoseStamped pose;
 			pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
@@ -293,17 +284,16 @@ bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_m
 		}
 
 		// t never reaches 0, so we add the parent here
-		std::shared_ptr<Node> parent = node->parent.lock();
 		geometry_msgs::PoseStamped pose;
 		pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
-		pose.pose.position.x = parent->pose.x;
-		pose.pose.position.y = parent->pose.y;
+		pose.pose.position.x = node->parent->pose.x;
+		pose.pose.position.y = node->parent->pose.y;
 		tf2::Quaternion quat;
-		quat.setRPY(0, 0, parent->pose.yaw);
+		quat.setRPY(0, 0, node->parent->pose.yaw);
 		pose.pose.orientation = tf2::toMsg(quat);
 		path.push_back(pose);
 
-		node = parent;
+		node = node->parent;
 	}
 
 	std::reverse(std::begin(path), std::end(path));
@@ -365,10 +355,10 @@ void RRTPlanner::publish_tree_cb(const ros::TimerEvent& event)
 		msg.pose.orientation.w = 1;
 
 		double sample[3];
-		double t = dubins_path_length(&node->edge);
+		double t = dubins_path_length(node->edge.get());
 		while(t > 0)
 		{
-			dubins_path_sample(&node->edge, t, sample);
+			dubins_path_sample(node->edge.get(), t, sample);
 
 			geometry_msgs::Point p;
 			p.x = sample[0];
@@ -379,15 +369,25 @@ void RRTPlanner::publish_tree_cb(const ros::TimerEvent& event)
 		}
 
 		// t never reaches 0, so we add the parent here
-
-		std::shared_ptr<Node> parent = node->parent.lock();
 		geometry_msgs::Point p;
-		p.x = parent->pose.x;
-		p.y = parent->pose.y;
+		p.x = node->parent->pose.x;
+		p.y = node->parent->pose.y;
 		msg.points.push_back(p);
 
 		this->tree_pub.publish(msg);
 	}
+}
+
+
+std::shared_ptr<DubinsPath> RRTPlanner::compute_path(const Pose& begin, const Pose& end)
+{
+	double edge_begin[] = {begin.x, begin.y, begin.yaw};
+	double edge_end[] = {end.x, end.y, end.yaw};
+	
+	auto edge = std::make_shared<DubinsPath>();
+	dubins_shortest_path(edge.get(), edge_begin, edge_end, TURNING_RADIUS);
+
+	return edge;
 }
 
 }

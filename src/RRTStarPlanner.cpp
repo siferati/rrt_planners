@@ -32,7 +32,7 @@ bool RRTStarPlanner::makePlan(
 		goal.pose.position.y,
 		tf2::getYaw(goal.pose.orientation)));
 
-	// create start to tree
+	// create start node
 	auto start_node = std::make_shared<Node>(Pose(
 		start.pose.position.x,
 		start.pose.position.y,
@@ -48,22 +48,17 @@ bool RRTStarPlanner::makePlan(
 	while (tree.size() < MAX_TREE_SIZE)
 	{
 		// sample goal pose or random pose from free space
-		Pose pose = this->goal_sample_distribution(this->rng) < EPSILON ? goal_node->pose : this->sample_random_pose();
-		double edge_end[] = {pose.x, pose.y, pose.yaw};
+		Pose pose = this->goal_sample_distribution(this->rng) < GOAL_SAMPLE_CHANCE ? goal_node->pose : this->sample_random_pose();
 
-		// get nearest node in the tree
+		// compute edge to nearest node in the tree
 		auto nearest = this->get_nearest_node(pose);
-		double edge_begin[] = {nearest->pose.x, nearest->pose.y, nearest->pose.yaw};
-
-		// tree edge is the shortest dubins path between the two poses
-		DubinsPath edge;		
-		dubins_shortest_path(&edge, edge_begin, edge_end, TURNING_RADIUS);
+		auto edge = this->compute_path(nearest->pose, pose);
 
 		// saturate
-		if (dubins_path_length(&edge) > RRT_STEP_SIZE)
+		if (dubins_path_length(edge.get()) > RRT_STEP_SIZE)
 		{
 			pose = this->steer(edge, RRT_STEP_SIZE);
-			dubins_extract_subpath(&edge, RRT_STEP_SIZE, &edge);
+			dubins_extract_subpath(edge.get(), RRT_STEP_SIZE, edge.get());
 		}
 
 		// TODO error on dubins return != 0

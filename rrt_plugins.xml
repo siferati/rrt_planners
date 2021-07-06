@@ -5,4 +5,7 @@
 	<class name="rrt_planners/RRTStarPlanner" type="rrt_planners::RRTStarPlanner" base_class_type="nav_core::BaseGlobalPlanner">
 		<description>An optimal global planner based on Rapidly-exploring Random Trees.</description>
 	</class>
+	<class name="rrt_planners/RRTXPlanner" type="rrt_planners::RRTXPlanner" base_class_type="nav_core::BaseGlobalPlanner">
+	<description>An optimal global planner based on Rapidly-exploring Random Trees.</description>
+	</class>
 </library>

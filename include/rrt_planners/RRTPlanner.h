@@ -14,7 +14,7 @@ class RRTPlanner : public nav_core::BaseGlobalPlanner
 public:
 	// TODO dynamic reconfigure
 	static constexpr int MAX_TREE_SIZE = 1000;
-	static constexpr double EPSILON = 0.05;
+	static constexpr double GOAL_SAMPLE_CHANCE = 0.05;
 	static constexpr double RRT_STEP_SIZE = 0.5;
 	static constexpr double TURNING_RADIUS = 0.25;
 	static constexpr double DUBINS_COL_STEP_SIZE = 0.25;
@@ -47,7 +47,7 @@ public:
 	 * @return		True if the path is in collision,
 	 * 				False otherwise.
 	 */ 
-	bool is_path_in_collision(DubinsPath& path) const;
+	bool is_path_in_collision(std::shared_ptr<DubinsPath> path) const;
 
 	/**
 	 * Samples a random pose from the obstacle-free space.
@@ -65,7 +65,17 @@ public:
 	 * 
 	 * @return 		The computed pose.
 	 */ 
-	Pose steer(DubinsPath& path, const double t) const;
+	Pose steer(std::shared_ptr<DubinsPath> path, const double t) const;
+
+	/**
+	 * Computes the path between the two given poses.
+	 * 
+	 * @param begin	The start of the path.
+	 * @param end 	The end of the path.
+	 * 
+	 * @return 		The computed path.
+	 */ 
+	std::shared_ptr<DubinsPath> compute_path(const Pose& begin, const Pose& end);
 
 	/**
 	 * Searches the tree for the nearest node to the given pose.
@@ -85,7 +95,7 @@ public:
 	 * 
 	 * @return			The new node.
 	 */ 
-	virtual std::shared_ptr<Node> add_node(const Pose& pose, std::shared_ptr<Node> parent, DubinsPath& edge);
+	virtual std::shared_ptr<Node> add_node(const Pose& pose, std::shared_ptr<Node> parent, std::shared_ptr<DubinsPath> edge);
 
 	/**
 	 * Reconnects the given node to the given parent if it's cheaper than current connection,
