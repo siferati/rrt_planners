@@ -29,6 +29,13 @@ public:
 	std::shared_ptr<Node> add_node(const Pose& pose);
 
 	/**
+	 * Culls the running neighbours from the given node,
+	 * to allow only edges that are shorter than the shrinking ball radius
+	 * or edges that are part of the tree.
+	 */ 
+	void cull_neighbours(std::shared_ptr<Node> node);
+
+	/**
 	 * Rewires the given node's in-neighbours
 	 * to use it as parent if it's better.
 	 * 
@@ -36,13 +43,26 @@ public:
 	 */ 
 	void rewire_neighbours(std::shared_ptr<Node> node);
 
+	/**
+	 * Propagates cost-to-goal information
+	 * through a rewiring cascade and makes nodes consistent.
+	 */ 
+	void reduce_inconsistency();
 
 	/**
-	 * Culls the running neighbours from the given node,
-	 * to allow only edges that are shorter than the shrinking ball radius
-	 * or edges that are part of the tree.
+	 * Update node's lmc based on its out-neighbours.
+	 * 
+	 * @param node Node to update.
 	 */ 
-	void cull_neighbours(std::shared_ptr<Node> node);
+	void update_lmc(std::shared_ptr<Node> node);
+
+protected:
+
+	/** Priority queue of nodes that are not e-consistent. */
+	std::set<
+		std::shared_ptr<Node>,
+		std::function<bool(std::shared_ptr<Node> n1, std::shared_ptr<Node> n2)>
+	> inconsistent_nodes;
 };
 
 }

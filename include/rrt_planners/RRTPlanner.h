@@ -139,6 +139,8 @@ public:
 	 */ 
 	void clear_markers() const;
 
+	void publish_edge(std::shared_ptr<DubinsPath> edge, int id);
+
 protected:
 	/** Publisher for the tree. */
 	ros::Publisher tree_pub;
