@@ -17,14 +17,17 @@ bool RRTXPlanner::makePlan(
 	const geometry_msgs::PoseStamped& goal,
 	std::vector<geometry_msgs::PoseStamped>& path)
 {
-	// TODO reset when new goal is diff from previous goal
+	// TODO dynamic rrtx
 
 	// thread safe
 	{
 		std::lock_guard<std::mutex> lock(this->tree_mutex);
 		this->tree.clear();
 		this->tree.reserve(MAX_TREE_SIZE);
+		
+		// delete markers
 		this->clear_markers();
+		ros::Duration(0.5).sleep();
 	}
 
 	// node comparator for the queue
@@ -41,8 +44,6 @@ bool RRTXPlanner::makePlan(
 		std::shared_ptr<Node>,
 		std::function<bool(std::shared_ptr<Node> n1, std::shared_ptr<Node> n2)>
 	>(comp);
-
-	// TODO check goal and start nodes cost and lmc
 
 	// create goal node
 	auto goal_node = std::make_shared<Node>(Pose(
@@ -105,15 +106,15 @@ bool RRTXPlanner::makePlan(
 			this->rewire_neighbours(node);
 			this->reduce_inconsistency();
 
-			// TODO connect to start if close enough?
+			// TODO connect to start if close enough
 		}
 	}
 
 	// signal planning end
 	this->is_planning.store(false);
 
-	// TODO maybe change this?
-	if (this->retrace_path(goal_node, path))
+	// TODO fix retrace
+	if (this->retrace_path(start_node, path))
 	{
 		this->publish_path(path);
 		return true;
@@ -210,7 +211,7 @@ void RRTXPlanner::rewire_neighbours(std::shared_ptr<Node> node)
 		// do not rewire the parent
 		if (neighbour == node->parent) return;
 
-		double lmc = dubins_path_length(edge.get()) + neighbour->lmc;
+		double lmc = dubins_path_length(edge.get()) + node->lmc;
 
 		// rewire neighbour if better
 		if (neighbour->lmc > lmc)

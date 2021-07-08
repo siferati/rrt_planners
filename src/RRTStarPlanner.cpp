@@ -21,7 +21,10 @@ bool RRTStarPlanner::makePlan(
 		std::lock_guard<std::mutex> lock(this->tree_mutex);
 		this->tree.clear();
 		this->tree.reserve(MAX_TREE_SIZE);
+		
+		// delete markers
 		this->clear_markers();
+		ros::Duration(0.5).sleep();
 	}
 
 	// TODO transform to costmap frame

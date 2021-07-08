@@ -44,7 +44,10 @@ bool RRTPlanner::makePlan(
 		std::lock_guard<std::mutex> lock(this->tree_mutex);
 		this->tree.clear();
 		this->tree.reserve(MAX_TREE_SIZE);
+		
+		// delete markers
 		this->clear_markers();
+		ros::Duration(0.5).sleep();
 	}
 
 	// TODO transform to costmap frame
@@ -368,10 +371,11 @@ void RRTPlanner::publish_tree_cb(const ros::TimerEvent& event)
 			t -= DUBINS_PUB_STEP_SIZE;
 		}
 
-		// t never reaches 0, so we add the parent here
+		// t never reaches 0, so we add it here
+		dubins_path_sample(node->edge.get(), 0, sample);
 		geometry_msgs::Point p;
-		p.x = node->parent->pose.x;
-		p.y = node->parent->pose.y;
+		p.x = sample[0];
+		p.y = sample[1];
 		msg.points.push_back(p);
 
 		this->tree_pub.publish(msg);
@@ -388,38 +392,6 @@ std::shared_ptr<DubinsPath> RRTPlanner::compute_path(const Pose& begin, const Po
 	dubins_shortest_path(edge.get(), edge_begin, edge_end, TURNING_RADIUS);
 
 	return edge;
-}
-
-void RRTPlanner::publish_edge(std::shared_ptr<DubinsPath> edge, int id)
-{
-	visualization_msgs::Marker msg;
-	msg.header.frame_id = this->costmap_ros->getGlobalFrameID();
-	msg.header.stamp = ros::Time::now();
-	msg.ns = "rrt_debug";
-	msg.id = id;
-	msg.action = visualization_msgs::Marker::ADD;
-	msg.type = visualization_msgs::Marker::LINE_STRIP;
-	msg.scale.x = 0.03;
-	msg.color.g = id == 0 ? 1 : 0;
-	msg.color.r = id == 0 ? 0 : 1;
-	msg.color.a = 0.5;
-	msg.pose.orientation.w = 1;
-
-	double sample[3];
-	double t = dubins_path_length(edge.get());
-	while(t > 0)
-	{
-		dubins_path_sample(edge.get(), t, sample);
-
-		geometry_msgs::Point p;
-		p.x = sample[0];
-		p.y = sample[1];
-		msg.points.push_back(p);
-
-		t -= DUBINS_PUB_STEP_SIZE;
-	}
-
-	this->tree_pub.publish(msg);
 }
 
 }

@@ -20,7 +20,7 @@ public:
 	static constexpr double DUBINS_COL_STEP_SIZE = 0.25;
 	static constexpr double DUBINS_PUB_STEP_SIZE = 0.05;
 	static constexpr double GOAL_THRESHOLD = 2.0;
-	static constexpr int TREE_PUBLISH_RATE = 30;
+	static constexpr int TREE_PUBLISH_RATE = 5;
 
 	virtual void initialize(std::string name, costmap_2d::Costmap2DROS* costmap_ros) override;
 
@@ -138,8 +138,6 @@ public:
 	 * Clears the published markers.
 	 */ 
 	void clear_markers() const;
-
-	void publish_edge(std::shared_ptr<DubinsPath> edge, int id);
 
 protected:
 	/** Publisher for the tree. */
