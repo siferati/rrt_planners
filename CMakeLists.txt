@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(rrt_planners)
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 add_compile_options(-std=c++14 -Wall -Wextra -pedantic)
 

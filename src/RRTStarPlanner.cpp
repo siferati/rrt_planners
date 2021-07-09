@@ -110,6 +110,7 @@ bool RRTStarPlanner::makePlan(
 }
 
 
+// TODO kdtree
 std::vector<std::shared_ptr<Node>> RRTStarPlanner::get_nodes_in_radius(const Pose& pose, const double radius) const
 {
 	std::vector<std::shared_ptr<Node>> nodes;

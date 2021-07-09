@@ -106,14 +106,27 @@ bool RRTXPlanner::makePlan(
 			this->rewire_neighbours(node);
 			this->reduce_inconsistency();
 
-			// TODO connect to start if close enough
+			// connect to start if close enough
+			if (node->pose.distance_to(start_node->pose) < GOAL_THRESHOLD)
+			{
+				auto edge = this->compute_path(start_node->pose, node->pose);		
+				double lmc = dubins_path_length(edge.get()) + node->lmc;
+
+				// reconnect start if better
+				if (start_node->lmc > lmc && !this->is_path_in_collision(edge))
+				{
+					start_node->parent = node;
+					start_node->lmc = lmc;
+					start_node->cost = lmc;
+					start_node->edge = edge;
+				}	
+			}
 		}
 	}
 
 	// signal planning end
 	this->is_planning.store(false);
 
-	// TODO fix retrace
 	if (this->retrace_path(start_node, path))
 	{
 		this->publish_path(path);
@@ -304,6 +317,52 @@ void RRTXPlanner::update_lmc(std::shared_ptr<Node> node)
 		std::end(node->running_out_neighbours),
 		rewire
 	);
+}
+
+
+bool RRTXPlanner:: retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path)
+{
+	if (node == nullptr || node->parent == nullptr)
+	{
+		return false;
+	}
+	
+	while (node->parent != nullptr)
+	{
+		double sample[3];
+		double length = dubins_path_length(node->edge.get());
+		double t = 0;
+		
+		while(t < length)
+		{
+			dubins_path_sample(node->edge.get(), t, sample);
+
+			geometry_msgs::PoseStamped pose;
+			pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
+			pose.pose.position.x = sample[0];
+			pose.pose.position.y = sample[1];
+			tf2::Quaternion quat;
+			quat.setRPY(0, 0, sample[2]);
+			pose.pose.orientation = tf2::toMsg(quat);
+			path.push_back(pose);
+
+			t += DUBINS_PUB_STEP_SIZE;
+		}
+
+		// t never reaches the parent, so we add it here
+		geometry_msgs::PoseStamped pose;
+		pose.header.frame_id = this->costmap_ros->getGlobalFrameID();
+		pose.pose.position.x = node->parent->pose.x;
+		pose.pose.position.y = node->parent->pose.y;
+		tf2::Quaternion quat;
+		quat.setRPY(0, 0, node->parent->pose.yaw);
+		pose.pose.orientation = tf2::toMsg(quat);
+		path.push_back(pose);
+
+		node = node->parent;
+	}
+
+	return true;
 }
 
 }

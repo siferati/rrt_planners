@@ -13,11 +13,11 @@ class RRTPlanner : public nav_core::BaseGlobalPlanner
 {
 public:
 	// TODO dynamic reconfigure
-	static constexpr int MAX_TREE_SIZE = 1000;
+	static constexpr int MAX_TREE_SIZE = 3000;
 	static constexpr double GOAL_SAMPLE_CHANCE = 0.05;
-	static constexpr double RRT_STEP_SIZE = 0.5;
+	static constexpr double RRT_STEP_SIZE = 2.0;
 	static constexpr double TURNING_RADIUS = 0.25;
-	static constexpr double DUBINS_COL_STEP_SIZE = 0.25;
+	static constexpr double DUBINS_COL_STEP_SIZE = 0.5;
 	static constexpr double DUBINS_PUB_STEP_SIZE = 0.05;
 	static constexpr double GOAL_THRESHOLD = 2.0;
 	static constexpr int TREE_PUBLISH_RATE = 5;
@@ -118,7 +118,7 @@ public:
 	 * 
 	 * @return True if a path exists, False otherwise.
 	 */
-	bool retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path);
+	virtual bool retrace_path(std::shared_ptr<Node> node, std::vector<geometry_msgs::PoseStamped>& path);
 
 	/**
 	 * Publishes the given path.

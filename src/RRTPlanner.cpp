@@ -197,6 +197,7 @@ Pose RRTPlanner::steer(std::shared_ptr<DubinsPath> path, const double t) const
 }
 
 
+// TODO kdtree
 std::shared_ptr<Node> RRTPlanner::get_nearest_node(const Pose& pose) const
 {
 	std::shared_ptr<Node> nearest = nullptr;
@@ -279,7 +280,7 @@ bool RRTPlanner::retrace_path(std::shared_ptr<Node> node, std::vector<geometry_m
 			pose.pose.position.x = sample[0];
 			pose.pose.position.y = sample[1];
 			tf2::Quaternion quat;
-			quat.setRPY(0, 0, sample[3]);
+			quat.setRPY(0, 0, sample[2]);
 			pose.pose.orientation = tf2::toMsg(quat);
 			path.push_back(pose);
 
