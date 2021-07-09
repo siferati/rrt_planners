@@ -16,7 +16,7 @@ public:
 	static constexpr int MAX_TREE_SIZE = 3000;
 	static constexpr double GOAL_SAMPLE_CHANCE = 0.05;
 	static constexpr double RRT_STEP_SIZE = 2.0;
-	static constexpr double TURNING_RADIUS = 0.25;
+	static constexpr double TURNING_RADIUS = 0.5;
 	static constexpr double DUBINS_COL_STEP_SIZE = 0.5;
 	static constexpr double DUBINS_PUB_STEP_SIZE = 0.05;
 	static constexpr double GOAL_THRESHOLD = 2.0;
